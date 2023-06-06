@@ -429,16 +429,8 @@ class TwentyOne
     player.blackjack? || dealer.blackjack?
   end
 
-  def participants_stay?
-    player.move == "stay" && dealer.move == "stay"
-  end
-
   def anyone_busted?
     player.busted? || dealer.busted?
-  end
-
-  def everyone_busted?
-    player.busted? && dealer.busted?
   end
 
   def win?(party, other_party)
