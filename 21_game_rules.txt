@@ -1,0 +1,45 @@
+      :::::::::::::::::::::::::TWENTY ONE:::::::::::::::::::::::::
+      
+      Twenty-one is a cardgame played between two participants:
+      + Player
+      + Dealer
+
+      There are two moves the participants can do:
+      + Hit:  The party choosing 'Hit' will add a card to their
+              Hand from the deck, randomly.
+      + Stay: The party choosing 'Stay' indicates that they are
+              done adding cards from the deck to their Hand for
+              current and all subsequent turns of the game.
+
+      Card Values:
+      2 - 9 : Cards value is equal to the number on the card.
+      Ace   : Card value can equal 11 or 1, depending on whether
+              their hand will go over 21.
+              (e.g.: A Hand of Two Aces has the value of 22 or 12.
+                     Since the goal get 21 or just below, value
+                     of 12 is the correct value)
+      Face  : Face cards include: Jack, Queen, and King, and are
+              valued at 10.
+
+      Procedure:
+      + Each participant's Hand starts with 2 random cards out of
+        a 52-card deck
+      + First Turn belongs to the player.
+        - As mentioned above, they can choose between two moves:
+          'Hit' or 'Stay'
+        - If the Player 'Busts' (their Hand's total value over 21)
+          after recieving a new card, then they will automatically
+          lose, assuming that the Dealer doesn't also 'Bust'.
+        - The player's turn is over once they 'Stay'.
+      + The Dealer's Turn is next.
+        - The dealer must 'Hit' if their Hand's total value is
+          less than 17.
+        - If the dealer busts, the player wins.
+      + Once both dealer and player decides to stay, both Hands
+        are revealed.
+      + If both Hands have the same total value, its a tie.
+      - Otherwise, the Hand's value that is closest to 21, wins!
+
+      Good Luck!
+
+      ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

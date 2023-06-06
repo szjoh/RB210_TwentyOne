@@ -1,18 +1,60 @@
+MIN_HAND = 17
+MAX_HAND = 21
+STARTING_HAND = 2
+
 module Hand
-  def show_cards
-    hand.each { |card| puts "[ #{card[0]} of #{card[1]} ]" }
+  SUIT_SYMBOL = { "Hearts" => "♥", "Diamonds" => "♦", "Spades" => "♠",
+                  "Clubs" => "♣", "HIDDEN" => "[HIDDEN]" }
+
+  def card_illustration(card)
+    <<-CARD_DISPLAY
+    .............
+    :           :
+    :  #{card[0].to_s[0]}        :
+    :           :
+    :#{SUIT_SYMBOL[card[1]].center(11, ' ')}:
+    :           :
+    :        #{card[0].to_s[0]}  :
+    :           :
+    :...........:
+    CARD_DISPLAY
+  end
+
+  def illustrate_cards
+    card_array = []
+    hand.each do |card|
+      card_array << card_illustration(card).lines
+    end
+    new_arr = card_array.transpose.map!(&:flatten)
+    new_arr.each do |lines|
+      lines.each_cons(hand.size) { |cards| puts cards.map(&:chomp).join }
+    end
+    puts "\n"
+  end
+
+  def illustrate_hidden_cards(hidden_hand)
+    card_array = []
+    hidden_hand.each do |card|
+      card_array << card_illustration(card).lines
+    end
+    new_arr = card_array.transpose.map!(&:flatten)
+    new_arr.each do |lines|
+      lines.each_cons(hidden_hand.size) do |cards|
+        puts cards.map(&:chomp).join
+      end
+    end
   end
 
   def display_cards
-    puts "#{@name}, you have the following #{hand.count} cards:"
-    show_cards
+    puts "#{@name}, you have the following #{hand.count} cards:\n\n"
+    illustrate_cards
   end
 
   def adjust_ace(total)
-    if total > 21
+    if total > MAX_HAND
       hand.select { |card| card[0] == "Ace" }.count.times do
         total -= 10
-        break if total <= 21
+        break if total <= MAX_HAND
       end
     end
     total
@@ -33,11 +75,11 @@ module Hand
     faces_and_numbers = hand.map { |card| card[0] }
     values = faces_and_numbers.map { |face| face_to_value(face) }
     sum = values.sum
-    sum <= 21 ? sum : adjust_ace(sum)
+    sum <= MAX_HAND ? sum : adjust_ace(sum)
   end
 
   def busted?
-    total_value > 21
+    total_value > MAX_HAND
   end
 
   def reset_hand
@@ -45,7 +87,7 @@ module Hand
   end
 
   def blackjack?
-    @hand.size == 2 && total_value == 21
+    @hand.size == STARTING_HAND && total_value == MAX_HAND
   end
 end
 
@@ -57,12 +99,12 @@ module Promptable
 
   def pause
     puts "...Loading...."
-    sleep 1
+    sleep 1.5
   end
 
   def pause_longer
     puts "...Loading...."
-    sleep 3
+    sleep 2.5
   end
 
   def clear
@@ -76,24 +118,20 @@ module Promptable
     puts "Please input 'r' for review"
     puts "OR \n'Enter' to continue to the game!"
     input = gets.chomp.downcase
-    puts game_description if input.start_with?("r")
-    puts "When you are ready to start the game,"
+    puts File.read("21_game_rules.txt") if input.start_with?("r")
     continue_any_key if input.start_with?("r")
-  end
-
-  def play_again?
-    puts ""
-    display_tally
-    puts "Would you like to play again? \nPress 'Enter' to go again"
-    puts "Enter 'e'/'3' to exit"
-    response = gets.chomp.downcase
-    return true unless response.strip == "e" || response.strip == '3'
   end
 end
 
 module Messageable
-  def center_form(string)
-    puts string.center(30, ":")
+  def max_format_size
+    sizes = [player.hand.size, dealer.hand.size]
+    18 * sizes.max
+  end
+
+  def center_form(string, border)
+    add_size = player.name.length
+    puts string.center(max_format_size + add_size, border)
   end
 
   def hit_or_stay_message
@@ -101,84 +139,84 @@ module Messageable
     puts "Enter 'h'/'1' to Hit or 's'/'2' to Stay"
   end
 
-  def winning_message
-    puts "The total value of #{dealer.name} is: #{dealer.total_value}"
-    puts "The total value of #{player.name} is: #{player.total_value}"
-    puts ""
+  def game_summary_message
     busted_message if anyone_busted?
-    someone_won
+    center_form("#{dealer.name}'s total value is: #{dealer.total_value}", " ")
+    center_form("#{player.name}'s total value is: #{player.total_value}", " ")
+    puts ""
   end
 
   def busted_message
-    puts "#{player.name}, you busted!" if player.busted?
-    puts "#{dealer.name} busted." if dealer.busted?
-  end
-
-  def reveal_card_message
-    clear
-    if anyone_busted?
-      center_form(" BUSTED! ")
-    else
-      center_form(" CARD REVEAL ")
-    end
-    puts ""
-    reveal_cards
-    pause_longer
+    center_form("#{player.name}, you busted!", " ") if player.busted?
+    center_form("#{dealer.name} busted.", " ") if dealer.busted?
   end
 
   def check_blackjack_message
     if push?
+      clear
       puts "PUSH!"
     elsif someone_blackjack?
+      clear
       puts "#{player.name}, YOU HAVE BLACKJACK!" if player.blackjack?
       puts "Dealer has Blackjack" if dealer.blackjack?
       pause_longer
-      reveal_card_message
     end
   end
 
-  def player_card_message
-    dealer.display_hidden_cards
-    puts ""
-    player.display_cards
-    player.display_total
+  def center_message
+    if anyone_busted?
+      center_form(" BUSTED! ", " ")
+    else
+      center_form(" CARD REVEAL ", " ")
+    end
   end
 
-  def dealer_card_message
+  def reveal_card_message
     clear
-    puts "The Dealer, #{@dealer.name}'s Cards:"
-    dealer.show_cards
-    dealer.display_total
     puts ""
+    reveal_cards
+    continue_any_key
   end
 
   def reveal_cards
-    center_form(" DEALER'S CARDS ")
-    dealer.show_cards
-    center_form(" [Total value is: #{dealer.total_value}] ")
+    center_form(" DEALER'S CARDS ", "=")
+    dealer.illustrate_cards
+    center_form(" [Total value is: #{dealer.total_value}] ", "=")
     puts ""
-    puts "=".center(30, "=")
+    center_message
     puts ""
-    center_form(" PLAYER'S CARDS ")
-    player.show_cards
-    puts ":::: [Total value is: #{player.total_value}] :::: \n\n"
+    center_form(" PLAYER'S CARDS ", "=")
+    player.illustrate_cards
+    center_form(" [Total value is: #{player.total_value}] ", "=")
+    puts ""
   end
 
   def display_tally
-    center_form(" Game Count ")
-    player_score = "#{@player.name} [ #{@player_score} ]"
-    dealer_score = "#{@dealer.name} [ #{@dealer_score} ]"
+    center_form(" Game Score ", " ")
+    player_score = "#{@player.name} [ #{player.score} ]"
+    dealer_score = "#{@dealer.name} [ #{dealer.score} ]"
     puts ""
-    center_form(" #{player_score} : #{dealer_score} ")
+    center_form(" #{dealer_score} : #{player_score} ", ":")
     puts ""
+  end
+
+  def play_again_message
+    center_form("Would you like to play again?", " ")
+    center_form("Press 'Enter' to go again", " ")
+    center_form("Enter 'e'/'3' to exit", " ")
+    puts ""
+    center_form(":", ":")
   end
 
   def display_good_bye_message
     clear
-    center_form(" FINAL ")
+    center_form(":", ":")
+    puts " "
+    center_form(" Final ", " ")
     display_tally
-    center_form(" Thanks for playing! ")
-    center_form("")
+    center_form(" Thanks for playing! ", " ")
+    puts " "
+    center_form(":", ":")
   end
 end
 
@@ -209,12 +247,22 @@ class Deck
 end
 
 class Participant
+  include Messageable
+  include Promptable
   include Hand
-  attr_reader :name, :hand
+  attr_reader :name, :hand, :score
+  attr_accessor :move
 
   def initialize
     @hand = []
     @name = ""
+    @score = 0
+    @move = "hit"
+  end
+
+  def reset_hand
+    @hand = []
+    @move = "hit"
   end
 
   def add_cards(card)
@@ -224,17 +272,76 @@ class Participant
   def display_total
     puts "Current Total Value: #{total_value}"
   end
+
+  def make_move(card)
+    case move
+    when "stay"
+      stay
+    when "hit"
+      hit_or_stay
+      add_cards(card) if move == "hit"
+    end
+  end
+
+  def hit
+    puts "#{@name} HITS!"
+    @move = 'hit'
+    pause
+  end
+
+  def stay
+    puts "#{@name} STAYS!"
+    @move = 'stay'
+    pause
+  end
+
+  def add_score
+    @score += 1
+  end
 end
 
 class Player < Participant
   def retrieve_name
     loop do
       puts "What is your name?"
-      @name = gets.chomp.capitalize
+      @name = gets.chomp.strip.capitalize
       break unless @name.strip == ""
       puts "That is not a valid name. Please try again."
     end
     puts "Welcome, #{@name}!"
+  end
+
+  def card_message
+    puts ""
+    display_cards
+    display_total
+  end
+
+  def valid_hit_stay?(response)
+    response == "1" ||
+      response == "2" ||
+      response.start_with?('h') ||
+      response.start_with?('s')
+  end
+
+  def hit_stay_response
+    loop do
+      response = gets.chomp.downcase
+      if response == '1' || response.start_with?('h')
+        hit
+      elsif response == '2' || response.start_with?('s')
+        stay
+      end
+      break if valid_hit_stay?(response)
+      puts "That is not a valid response, please enter 'h'/'1' or 's'/'2'!"
+    end
+  end
+
+  def hit_or_stay
+    card_message
+    hit_or_stay_message
+    hit_stay_response
+    clear
   end
 end
 
@@ -247,80 +354,49 @@ class Dealer < Participant
   end
 
   def display_hidden_cards
-    first_card = "[ #{@hand[0][0]} of #{@hand[0][1]} ]"
+    hidden_hand = [@hand[0], [" ", "HIDDEN"]]
     puts "#{name} has #{@hand.count} cards."
-    @hand.each_index do |index|
-      index == 0 ? (puts first_card) : (puts "[ Hidden ]")
+    illustrate_hidden_cards(hidden_hand)
+  end
+
+  def hit_or_stay
+    if hand.size == STARTING_HAND
+      pause
     end
+    card_message
+    if total_value < MIN_HAND
+      hit
+    else
+      stay
+    end
+  end
+
+  def card_message
+    clear
+    puts "The Dealer, #{@name}'s Cards:"
+    illustrate_cards
+    display_total
+    puts ""
   end
 end
 
 class TwentyOne
   include Promptable
   include Messageable
-  attr_reader :shuffled_deck, :player, :dealer
+  attr_reader :player, :dealer
+  attr_accessor :shuffled_deck
 
   def initialize
     @shuffled_deck = Deck.new
     @player = Player.new
     @dealer = Dealer.new
-    @player_score = 0
-    @dealer_score = 0
-    @dealer_move = ""
-    @player_move = ""
   end
 
   def reset_game
-    @dealer_move = ""
-    @player_move = ""
     @shuffled_deck.reset_deck
     player.reset_hand
     dealer.reset_hand
     clear
-  end
-
-  def game_description
-    <<-DSCRP
-      :::::::::::::::::::::::::TWENTY ONE:::::::::::::::::::::::::\n
-      Twenty-one is a cardgame played between two participants:
-      + Player
-      + Dealer\n
-      There are two moves the participants can do:
-      + Hit:  The party choosing 'Hit' will add a card to their
-              Hand from the deck, randomly.
-      + Stay: The party choosing 'Stay' indicates that they are
-              done adding cards from the deck to their Hand for
-              current and all subsequent turns of the game.\n
-      Card Values:
-      2 - 9 : Cards value is equal to the number on the card.
-      Ace   : Card value can equal 11 or 1, depending on whether
-              their hand will go over 21.
-              (e.g.: A Hand of Two Aces has the value of 22 or 12.
-                     Since the goal get 21 or just below, value
-                     of 12 is the correct value)
-      Face  : Face cards include: Jack, Queen, and King, and are
-              valued at 10.\n
-      Procedure:
-      + Each participant's Hand starts with 2 random cards out of
-        a 52-card deck
-      + First Turn belongs to the player.
-        - As mentioned above, they can choose between two moves:
-          'Hit' or 'Stay'
-        - If the Player 'Busts' (their Hand's total value over 21)
-          after recieving a new card, then they will automatically
-          lose, assuming that the Dealer doesn't also 'Bust'.
-        - The player's turn is over once they 'Stay'.
-      + The Dealer's Turn is next.
-        - The dealer must 'Hit' if their Hand's total value is
-          less than 17.
-        - If the dealer busts, the player wins.
-      + Once both dealer and player decides to stay, both Hands
-        are revealed.
-      + If both Hands have the same total value, its a tie.
-      - Otherwise, the Hand's value that is closest to 21, wins!\n
-      Good Luck!\n
-      ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    DSCRP
   end
 
   def retrieve_names
@@ -341,6 +417,10 @@ class TwentyOne
     deal_first_cards(dealer)
   end
 
+  def deal_and_add(participant)
+    participant.add_cards([shuffled_deck.deal])
+  end
+
   def push?
     player.blackjack? && dealer.blackjack?
   end
@@ -349,54 +429,8 @@ class TwentyOne
     player.blackjack? || dealer.blackjack?
   end
 
-  def deal_and_add(participant)
-    participant.add_cards([shuffled_deck.deal])
-  end
-
-  def hit
-    puts "Hit!"
-    @player_move = "hit"
-    deal_and_add(player)
-  end
-
-  def stay
-    puts "Stay!"
-    @player_move = "stay"
-  end
-
-  def valid_hit_stay?(response)
-    response == "1" ||
-      response == "2" ||
-      response.start_with?('h') ||
-      response.start_with?('s')
-  end
-
-  def hit_stay_response
-    loop do
-      response = gets.chomp.downcase
-      if response == '1' || response.start_with?('h')
-        hit
-      elsif response == '2' || response.start_with?('s')
-        stay
-      end
-      break if valid_hit_stay?(response)
-      puts "That is not a valid response, please enter 'h' or 's'!"
-    end
-  end
-
-  def dealer_hit_or_stay
-    if dealer.total_value < 17
-      puts "#{dealer.name} will hit!"
-      @dealer_move = "hit"
-      deal_and_add(dealer)
-    else
-      puts "#{dealer.name} stays!"
-      @dealer_move = "stay"
-    end
-  end
-
   def participants_stay?
-    @player_move == "stay" && @dealer_move == "stay"
+    player.move == "stay" && dealer.move == "stay"
   end
 
   def anyone_busted?
@@ -413,45 +447,42 @@ class TwentyOne
       other_party.busted?
   end
 
-  def someone_won
+  def tally_winner
     if win?(player, dealer)
-      puts "#{player.name}, you WIN!"
-      @player_score += 1
+      center_form("#{player.name}, you WIN!", " ")
+      player.add_score
     elsif win?(dealer, player)
-      puts "#{dealer.name} WINS"
-      @dealer_score += 1
+      center_form("#{dealer.name} WINS", " ")
+      dealer.add_score
     else
-      puts "Its a TIE!"
+      center_form("Its a TIE!", " ")
     end
   end
 
-  def player_hit_or_stay
-    hit_or_stay_message
-    hit_stay_response
-    pause
-  end
-
-  def player_move
+  def hit_loop(participant)
     loop do
-      @player_move == "stay" ? break : player_card_message
-      player_hit_or_stay
-      clear
-      break if player.busted?
-    end
-  end
-
-  def dealer_move
-    loop do
-      @dealer_move == "stay" ? break : dealer_card_message
-      dealer_hit_or_stay
-      pause
-      break if dealer.busted?
+      dealer.display_hidden_cards if dealer.hand.size == STARTING_HAND
+      participant.make_move([shuffled_deck.deal])
+      break if participant.move == "stay" || participant.busted?
     end
   end
 
   def participants_move
-    player_move
-    dealer_move unless player.busted?
+    clear
+    hit_loop(player)
+    hit_loop(dealer) unless player.busted?
+  end
+
+  def play_again?
+    clear
+    puts center_form(":", ":")
+    tally_winner
+    game_summary_message
+    puts ""
+    display_tally
+    play_again_message
+    response = gets.chomp.downcase
+    return true unless response.strip == "e" || response.strip == '3'
   end
 
   def main_game
@@ -460,8 +491,6 @@ class TwentyOne
       check_blackjack_message
       participants_move unless someone_blackjack?
       reveal_card_message
-      clear
-      winning_message
       break unless play_again?
       reset_game
     end
@@ -478,123 +507,3 @@ end
 game = TwentyOne.new
 
 game.play
-
-=begin
-We'll follow our familiar pattern on tackling the OO Twenty-One game:
-
-Write a description of the problem and extract major nouns and verbs.
-Make an initial guess at organizing the verbs into nouns and do a spike
-to explore the problem with temporary code.
-
-Optional - when you have a better idea of the problem,
-model your thoughts into CRC cards.
-
-DESCRIPTION
-Twenty-one is a cardgame that is played between two people:
-- Player
-- Dealer
-Each participant is dealt 2 cards out of a 52 card deck
-- At this point, the player will take the first turn.
-- The player has two moves, 'Hit' or 'Stay'
-- Hit involves receiving a card out of the card deck, randomly.
-- Stay means that they are done recieving cards from the deck
-- after making their move it is now Dealer's Turn
-- The dealer must play if their hand is less than 17.
-- If the dealer busts, the player wins.
-- Once both dealer and player decides to stay, both hands are revealed
-- If the cards add up to the same, its a tie.
-- Otherwise, whoever has the hand that is closest to 21 wins.
-
-General planning:
-
-NOUNS
-Game
-
-Participants
-- Player
-- Dealer
-
-Hand
-- Card
-- Total
-Deck
-- Card
-
-Results
--Win
--Lose
--Tie
-
-VERBS
-Deal
-Move
-- Hit
-- Stay
-Busts
-
-General Organization of Classes:
-
-Participants
-  :hand
-
-  Methods:
-  Move
-  - Hit
-   - random card from deck
-  - Stay
-   - ends their turn
-
-  Calculate_total
-  - needs to access @hand
-
- < Player
- < Dealer
-  def Move
-  * for Dealer, if condition, of total < 17, they must hit
-end
-
-Deck
-  # reusuable class for other cardgames?
-includes all 52 cards.
-- Reset setting
-reset
- - re-creates the original 52 deck card.
-
-Suits
-  - Heart
-  - Diamond
-  - Clubs
-  - Spades
-Numbers
-  Ace -> 1 or 11
-  2-9
-  Jack -> 10
-  King -> 10
-  Queen -> 10
-
-  Card will be looking like Deck =
-  {["Diamond", 'Ace'] => 1, ... ["Clubs", 'King'] => 10}
-  to_s
-    Deck.
-end
-
-Game
-  :Player, :Dealer, :Deck???, :Deal
-
-  initialize
-  - Player and Name
-  - Dealer
-  - Deal each Participant their initial hand.
-
-  play
-  -sequences
-
-  results
-  - Busted
-  - Tie
-  - Participant wins (player vs Dealer.)
-end
-
-Deck
-end
-=end
